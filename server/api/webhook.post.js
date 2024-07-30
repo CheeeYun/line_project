@@ -1,6 +1,7 @@
 import {defineEventHandler, readBody} from 'h3';
 import {Client, validateSignature} from '@line/bot-sdk';
 import * as dotenv from 'dotenv';
+import {createFlexMessage} from '../flexMessageTemplate';
 
 dotenv.config();
 
@@ -87,21 +88,69 @@ async function handleEvent(event) {
   if (event.text && event.text.startsWith('New form submission:')) {
     const userId = extractUserIdFromFormSubmission(event.text);
     if (userId) {
-      const message = {
-        type: 'text',
-        text: `我們已收到您的訂單：\n${event.text}`,
-      };
+      const formData = parseFormSubmission(event.text);
+      console.log('formData', formData);
+      const flexMessage = createFlexMessage(
+        formData.items,
+        formData.total,
+        formData
+      );
+      console.log('date', formData.items.date);
 
-      await client.pushMessage(userId, message);
+      await client.pushMessage(userId, flexMessage);
     } else {
       console.error('No userId found in form submission text.');
     }
   } else {
     console.log('Event is not a text message, ignoring...');
   }
-}
 
-function extractUserIdFromFormSubmission(text) {
-  const userIdMatch = text.match(/USER_ID: (\w+)/);
-  return userIdMatch ? userIdMatch[1] : null;
+  function parseFormSubmission(text) {
+    const lines = text.split('\n');
+    const items = [];
+    let total = 0;
+    let date = '';
+    let time = '';
+    let userId = '';
+    let contact = '';
+    let username = '';
+    let diningMethod = '';
+
+    const itemsWithUnit = ['胡椒蝦', '蒜蓉蝦', '鹽焗蝦', '胡椒風螺', '鹽烤魚'];
+
+    for (const line of lines) {
+      if (line.startsWith('USER_ID: ')) {
+        userId = line.split(': ')[1];
+      } else if (line.startsWith('取餐日期: ')) {
+        date = line.split(': ')[1];
+      } else if (line.startsWith('取餐時間: ')) {
+        time = line.split(': ')[1];
+      } else if (line.startsWith('聯絡電話: ')) {
+        contact = line.split(': ')[1];
+      } else if (line.startsWith('訂購人（line稱呼): ')) {
+        username = line.split(': ')[1];
+      } else if (line.startsWith('用餐方式: ')) {
+        diningMethod = line.split(': ')[1];
+      } else if (line.includes(':')) {
+        const [name, qtyStr] = line.split(': ');
+        let qty = 0;
+        if (itemsWithUnit.includes(name)) {
+          qty = parseInt(qtyStr.replace(/[^0-9]/g, '')); // 去掉數量後面的字
+        } else {
+          qty = parseInt(qtyStr); // 直接解析数量
+        }
+        if (!isNaN(qty)) {
+          items.push({name, qty: `${qty}`});
+          total += qty; // 累加总数量
+        }
+      }
+    }
+
+    return {items, total, date, time, userId, contact, username, diningMethod};
+  }
+  // 提取用戶ID
+  function extractUserIdFromFormSubmission(text) {
+    const userIdMatch = text.match(/USER_ID: (\w+)/);
+    return userIdMatch ? userIdMatch[1] : null;
+  }
 }
