@@ -50,7 +50,7 @@ export default defineEventHandler(async (event) => {
     const response = await axios.post(`${BASE_URL}${URI}`, paymentBody, {
       headers: {
         'Content-Type': 'application/json',
-        'X-LINE-ChannelId': `${process.env.LINE_TEST_CHANNELID}`,
+        'X-LINE-ChannelId': CHANNEL_ID,
         'X-LINE-Authorization-Nonce': nonce,
         'X-LINE-Authorization': signature,
       },
