@@ -1,5 +1,4 @@
 import axios from 'axios';
-import {log} from 'console';
 import crypto from 'crypto';
 
 export default defineEventHandler(async (event) => {
