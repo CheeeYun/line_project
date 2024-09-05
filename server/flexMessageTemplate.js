@@ -326,7 +326,7 @@ const createFlexMessage = (items, total, formData, userId) => {
       action: {
         type: 'uri',
         label: '點我付款',
-        uri: `https://6ae6-223-137-132-172.ngrok-free.app/transport?amount=${discountedTotalPrice.toFixed(
+        uri: `https://line-project-3.onrender.com/transport?amount=${discountedTotalPrice.toFixed(
           2
         )}&orderId=${timestamp}&userId=${userId}`, // 在这里动态生成付款 URL
       },

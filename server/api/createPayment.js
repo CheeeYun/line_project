@@ -33,8 +33,8 @@ export default defineEventHandler(async (event) => {
       },
     ],
     redirectUrls: {
-      confirmUrl: `https://6ae6-223-137-132-172.ngrok-free.app/success?amount=${amount2}&userId=${userId}`,
-      cancelUrl: 'https://6ae6-223-137-132-172.ngrok-free.app',
+      confirmUrl: `https://line-project-3.onrender.com/success?amount=${amount2}&userId=${userId}`,
+      cancelUrl: 'https://line-project-3.onrender.com/',
     },
   };
 
