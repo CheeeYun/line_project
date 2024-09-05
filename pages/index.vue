@@ -18,6 +18,7 @@ const sendMessage = async () => {
       body: JSON.stringify({message: message.value}),
     });
     const result = await response.json();
+    // 示例调用
     console.log(result);
   } catch (error) {
     console.error('Error sending message:', error);

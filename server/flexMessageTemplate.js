@@ -1,4 +1,4 @@
-const createFlexMessage = (items, total, formData) => {
+const createFlexMessage = (items, total, formData, userId) => {
   const itemContents = items.map((item) => ({
     type: 'box',
     layout: 'baseline',
@@ -39,8 +39,10 @@ const createFlexMessage = (items, total, formData) => {
   const originalTotalPrice = total * 300;
   const discountedTotalPrice = originalTotalPrice * discountRate;
   const discountAmount = originalTotalPrice - discountedTotalPrice;
+  //訂單編號
+  const timestamp = Date.now();
 
-  return {
+  const flexMessage = {
     type: 'flex',
     altText: '收到您的訂餐囉！',
     contents: {
@@ -275,10 +277,62 @@ const createFlexMessage = (items, total, formData) => {
               },
             ],
           },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: `支付方式: ${formData.pay}`,
+                color: '#aaaaaa',
+                size: 'sm',
+                flex: 1,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'baseline',
+            spacing: 'sm',
+            margin: 'md',
+            contents: [
+              {
+                type: 'text',
+                text: `訂單編號: ${timestamp}`,
+                color: '#aaaaaa',
+                size: 'sm',
+                flex: 1,
+              },
+            ],
+          },
+          {
+            type: 'box',
+            layout: 'vertical', // 增加一个空白行
+            margin: 'md',
+            contents: [],
+          },
         ],
       },
     },
   };
+  // 如果支付方式是 linePay，添加付款按钮
+  if (formData.pay === 'linePay') {
+    flexMessage.contents.body.contents.push({
+      type: 'button',
+      style: 'primary',
+      color: '#1DB446',
+      action: {
+        type: 'uri',
+        label: '點我付款',
+        uri: `https://6ae6-223-137-132-172.ngrok-free.app/transport?amount=${discountedTotalPrice.toFixed(
+          2
+        )}&orderId=${timestamp}&userId=${userId}`, // 在这里动态生成付款 URL
+      },
+    });
+  }
+  return flexMessage;
 };
 
 export {createFlexMessage};

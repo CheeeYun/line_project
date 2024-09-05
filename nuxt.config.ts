@@ -5,5 +5,5 @@ export default defineNuxtConfig({
     LINE_CHANNEL_SECRET: process.env.LINE_CHANNEL_SECRET,
   },
 
-  compatibilityDate: "2024-07-19",
+  compatibilityDate: '2024-07-19',
 });

@@ -93,7 +93,8 @@ async function handleEvent(event) {
       const flexMessage = createFlexMessage(
         formData.items,
         formData.total,
-        formData
+        formData,
+        userId
       );
       console.log('date', formData.items.date);
 
@@ -115,6 +116,7 @@ async function handleEvent(event) {
     let contact = '';
     let username = '';
     let diningMethod = '';
+    let pay = '';
 
     const itemsWithUnit = ['胡椒蝦', '蒜蓉蝦', '鹽焗蝦', '胡椒風螺', '鹽烤魚'];
 
@@ -131,6 +133,8 @@ async function handleEvent(event) {
         username = line.split(': ')[1];
       } else if (line.startsWith('用餐方式: ')) {
         diningMethod = line.split(': ')[1];
+      } else if (line.startsWith('支付方式: ')) {
+        pay = line.split(': ')[1];
       } else if (line.includes(':')) {
         const [name, qtyStr] = line.split(': ');
         let qty = 0;
@@ -146,7 +150,17 @@ async function handleEvent(event) {
       }
     }
 
-    return {items, total, date, time, userId, contact, username, diningMethod};
+    return {
+      items,
+      total,
+      date,
+      time,
+      userId,
+      contact,
+      username,
+      diningMethod,
+      pay,
+    };
   }
   // 提取用戶ID
   function extractUserIdFromFormSubmission(text) {

@@ -11,6 +11,9 @@
   },
   "dependencies": {
     "@line/bot-sdk": "^9.2.2",
+    "axios": "^1.7.7",
+    "crypto": "^1.0.1",
+    "crypto-js": "^4.2.0",
     "dotenv": "^16.4.5",
     "nuxt": "^3.12.3",
     "vue": "^3.4.31",
