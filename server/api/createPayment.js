@@ -4,7 +4,7 @@ import crypto from 'crypto';
 export default defineEventHandler(async (event) => {
   const CHANNEL_ID = process.env.LINE_TEST_CHANNELID;
   const CHANNEL_SECRET = process.env.LINE_TEST_CHANNELSECRETKEY;
-  const BASE_URL = 'https://sandbox-api-pay.line.me';
+  const BASE_URL = 'https://api-pay.line.me';
   const URI = '/v3/payments/request';
 
   const body = await readBody(event);
