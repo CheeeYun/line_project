@@ -65,7 +65,7 @@ async function handleEvent(event) {
       if (userInput.includes('訂餐')) {
         const userId = event.source.userId;
         const formLinkTemplate =
-          'https://docs.google.com/forms/d/e/1FAIpQLSdM74yhdahZfMwCi6JRfdc06cEQPJR0fz5m8Xg2FS7dJFaFHA/viewform?usp=pp_url&entry.734283474=PLACEHOLDER_USER_ID';
+          'https://docs.google.com/forms/d/e/1FAIpQLSdM74yhdahZfMwCi6JRfdc06cEQPJR0fz5m8Xg2FS7dJFaFHA/viewform?usp=pp_url&entry.1987383699=PLACEHOLDER_USER_ID';
         const personalizedLink = formLinkTemplate.replace(
           'PLACEHOLDER_USER_ID',
           userId
