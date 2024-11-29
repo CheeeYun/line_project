@@ -2,6 +2,7 @@ import {defineEventHandler, readBody} from 'h3';
 import {Client, validateSignature} from '@line/bot-sdk';
 import * as dotenv from 'dotenv';
 import {createFlexMessage} from '../flexMessageTemplate';
+import axios from 'axios';
 
 dotenv.config();
 
@@ -11,6 +12,9 @@ const config = {
 };
 
 const client = new Client(config);
+
+// 全局開關狀態
+let broadcastEnabled = false;
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -37,46 +41,98 @@ export default defineEventHandler(async (event) => {
     }
     return {statusCode: 200, body: 'OK'};
   } catch (err) {
-    console.error('Error handling event:', err);
+    console.error('Error handling event from webhook:', err);
     return {statusCode: 500, body: 'Internal Server Error'};
   }
 });
 
 async function handleEvent(event) {
-  console.log('Handling event:', event);
+  console.log('Handling event at webhook:', event);
 
   // 处理来自LINE的普通消息
   if (event.replyToken) {
-    if (event.type === 'message' && event.message.type === 'text') {
-      const userInput = event.message.text;
-      const keywords = {
-        營業: '營業時間:五、六、日 18:00-賣完為止。更詳細資訊請詳見”FB粉絲專頁“',
-        有開: '營業時間:五、六、日 18:00-賣完為止。更詳細資訊請詳見”FB粉絲專頁”',
-      };
+    if (event.type === 'message') {
+      if (event.message.type === 'text' && !broadcastEnabled) {
+        const userInput = event.message.text;
+        const keywords = {
+          營業: '營業時間:五、六、日 18:00-賣完為止。更詳細資訊請詳見”FB粉絲專頁“',
+          有開: '營業時間:五、六、日 18:00-賣完為止。更詳細資訊請詳見”FB粉絲專頁”',
+        };
 
-      for (const keyword of Object.keys(keywords)) {
-        if (userInput.includes(keyword)) {
-          const reply = {type: 'text', text: keywords[keyword]};
+        for (const keyword of Object.keys(keywords)) {
+          if (userInput.includes(keyword)) {
+            const reply = {type: 'text', text: keywords[keyword]};
+            await client.replyMessage(event.replyToken, reply);
+            return;
+          }
+        }
+
+        if (userInput.includes('訂餐')) {
+          const userId = event.source.userId;
+          const formLinkTemplate =
+            'https://docs.google.com/forms/d/e/1FAIpQLSdM74yhdahZfMwCi6JRfdc06cEQPJR0fz5m8Xg2FS7dJFaFHA/viewform?usp=pp_url&entry.1987383699=PLACEHOLDER_USER_ID';
+          const personalizedLink = formLinkTemplate.replace(
+            'PLACEHOLDER_USER_ID',
+            userId
+          );
+
+          const message = {
+            type: 'text',
+            text: `請點擊以下連結訂餐：\n${personalizedLink}`,
+          };
+
+          await client.replyMessage(event.replyToken, message);
+          return;
+        }
+
+        // 控制廣播開關
+        if (userInput === 'broadcast-open') {
+          broadcastEnabled = true;
+          const reply = {
+            type: 'text',
+            text: 'Broadcast enabled for the next message.',
+          };
           await client.replyMessage(event.replyToken, reply);
           return;
         }
       }
+      // 调用 cloneMessage API
+      if (broadcastEnabled) {
+        console.log('Broadcast enabled, preparing to call cloneMessage API...');
+        console.log('廣播資料：', event);
 
-      if (userInput.includes('訂餐')) {
-        const userId = event.source.userId;
-        const formLinkTemplate =
-          'https://docs.google.com/forms/d/e/1FAIpQLSdM74yhdahZfMwCi6JRfdc06cEQPJR0fz5m8Xg2FS7dJFaFHA/viewform?usp=pp_url&entry.1987383699=PLACEHOLDER_USER_ID';
-        const personalizedLink = formLinkTemplate.replace(
-          'PLACEHOLDER_USER_ID',
-          userId
-        );
+        try {
+          // 发送事件到 cloneMessage API
+          const response = await axios.post(
+            `${process.env.BASE_URL}/api/cloneMessage`,
+            {
+              events: [event], // 将事件包装为数组，符合 `cloneMessage` API 的格式
+            }
+          );
 
-        const message = {
-          type: 'text',
-          text: `請點擊以下連結訂餐：\n${personalizedLink}`,
-        };
+          console.log('cloneMessage API response:', response.data);
 
-        await client.replyMessage(event.replyToken, message);
+          // 将克隆消息的内容发送回用户
+          const clonedMessage = response.data;
+          await client.replyMessage(event.replyToken, clonedMessage);
+
+          console.log('Sent cloned message:', clonedMessage);
+        } catch (error) {
+          console.error('Error calling cloneMessage API:', error.message);
+
+          const errorMessage =
+            error.response && error.response.data
+              ? `Error broadcasting message: ${error.response.data}`
+              : 'Error broadcasting message.';
+
+          const reply = {type: 'text', text: errorMessage};
+          await client.replyMessage(event.replyToken, reply);
+        } finally {
+          // 在任何情况下都关闭广播模式
+          broadcastEnabled = false;
+          console.log('Broadcast mode disabled.');
+        }
+
         return;
       }
     } else {
