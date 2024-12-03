@@ -1,0 +1,6 @@
+node_modules
+npm_cache
+.npm
+.pnpm-store
+*.log
+.env
