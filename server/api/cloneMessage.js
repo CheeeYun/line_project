@@ -1,4 +1,4 @@
-import {defineEventHandler, readBody} from 'h3';
+import {defineEventHandler, readRawBody} from 'h3';
 import {Client, validateSignature} from '@line/bot-sdk';
 import dotenv from 'dotenv';
 import pool from './db'; // 导入数据库连接池
@@ -17,23 +17,32 @@ const TARGET_USER_ID = 'U28efaeb3c903677cad4386401e65f876';
 console.log('welcome cloneMessage');
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const rawBody = await readRawBody(event);
+  console.log('%%%%%%%%%', rawBody);
+  console.log('%%%%%%[event]%%%%%', event);
 
   // 验证请求的签名
   const signature = event.req.headers['x-line-signature'];
   if (
     signature &&
-    !validateSignature(JSON.stringify(body), config.channelSecret, signature)
+    !validateSignature(rawBody || '', config.channelSecret, signature)
   ) {
     console.error('Unauthorized request');
     return {statusCode: 401, body: 'Unauthorized'};
   }
 
   try {
+    // 解析原始请求体
+    const body = JSON.parse(rawBody || '{}');
+
     if (body.events) {
-      await Promise.all(body.events.map(handleEvent));
+      // 收集所有事件的克隆消息
+      const replies = await Promise.all(body.events.map(handleEvent));
+
+      // 返回第一个事件的回复给调用者（通常事件只包含一个）
+      return replies[0];
     }
-    return {statusCode: 200, body: 'OK'};
+    return {statusCode: 400, body: 'No events found in request.'};
   } catch (error) {
     console.error('Error handling event from cloneMessage:', error);
     return {statusCode: 500, body: 'Internal Server Error'};
@@ -49,10 +58,9 @@ async function handleEvent(event) {
 
     if (event.message && event.message.type === 'text') {
       const reply = {type: 'text', text: event.message.text};
-      console.log('$$', reply.text);
+      console.log('$$', reply);
 
-      await client.replyMessage(event.replyToken, reply);
-      return;
+      return reply;
     }
 
     if (event.message && event.message.type === 'image') {
@@ -80,8 +88,7 @@ async function handleEvent(event) {
           previewImageUrl: imageUrl,
         };
 
-        await client.replyMessage(event.replyToken, reply);
-        return;
+        return reply;
       } catch (error) {
         console.error('Error handling image message:', error);
       }

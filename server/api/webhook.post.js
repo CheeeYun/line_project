@@ -1,4 +1,4 @@
-import {defineEventHandler, readBody} from 'h3';
+import {defineEventHandler, readRawBody} from 'h3';
 import {Client, validateSignature} from '@line/bot-sdk';
 import * as dotenv from 'dotenv';
 import {createFlexMessage} from '../flexMessageTemplate';
@@ -17,37 +17,56 @@ const client = new Client(config);
 let broadcastEnabled = false;
 
 export default defineEventHandler(async (event) => {
-  const body = await readBody(event);
+  const rawBody = await readRawBody(event);
+  const parsedRawBody = JSON.parse(rawBody); //rawBody轉JSON
 
-  console.log('Received event:', body);
-
-  // Verify the request only if it has the signature header
   const signature = event.req.headers['x-line-signature'];
   if (signature) {
-    if (
-      !validateSignature(JSON.stringify(body), config.channelSecret, signature)
-    ) {
+    if (!validateSignature(rawBody, config.channelSecret, signature)) {
       console.error('Unauthorized request');
       return {statusCode: 401, body: 'Unauthorized'};
     }
   }
 
-  // Process the event
+  // 處理事件
   try {
-    if (body.events) {
-      await Promise.all(body.events.map(handleEvent));
+    if (parsedRawBody?.events) {
+      const replies = await Promise.all(parsedRawBody.events.map(handleEvent));
+      return replies[0]; // 返回第一個事件的結果
     } else {
-      await handleEvent(body); // For local testing
+      console.log('No valid events found in rawBody.');
+      return {statusCode: 400, body: 'No events found'};
     }
-    return {statusCode: 200, body: 'OK'};
-  } catch (err) {
-    console.error('Error handling event from webhook:', err);
+  } catch (error) {
+    console.error('Error processing event:', error);
     return {statusCode: 500, body: 'Internal Server Error'};
   }
 });
 
 async function handleEvent(event) {
   console.log('Handling event at webhook:', event);
+
+  //存用戶Id
+  if (event.source && event.source.userId) {
+    const userId = event.source.userId;
+
+    // 获取 DisplayName
+    const displayName = await getDisplayName(userId);
+
+    // 保存用户信息
+    try {
+      const response = await axios.post(
+        `${process.env.BASE_URL}/api/insertMembers`,
+        {
+          userId: userId,
+          displayName: displayName,
+        }
+      );
+      console.log('SaveUser API response:', response.data);
+    } catch (error) {
+      console.error('Error calling SaveUser API:', error.message);
+    }
+  }
 
   // 处理来自LINE的普通消息
   if (event.replyToken) {
@@ -102,6 +121,13 @@ async function handleEvent(event) {
         console.log('廣播資料：', event);
 
         try {
+          // 从数据库中获取所有用户的 userId
+          const userIdsResponse = await axios.get(
+            `${process.env.BASE_URL}/api/getAllUserIds`
+          );
+          const userIds = userIdsResponse.data;
+          console.log('userId列表>>>', userIds);
+
           // 发送事件到 cloneMessage API
           const response = await axios.post(
             `${process.env.BASE_URL}/api/cloneMessage`,
@@ -114,6 +140,42 @@ async function handleEvent(event) {
 
           // 将克隆消息的内容发送回用户
           const clonedMessage = response.data;
+          // 检查消息类型
+          if (!clonedMessage || !clonedMessage.type) {
+            throw new Error('Invalid message returned from cloneMessage API');
+          }
+
+          // 给每个用户发送消息
+          await Promise.all(
+            userIds.map(async (userId) => {
+              try {
+                console.log('發送給每個人');
+
+                if (clonedMessage.type === 'text') {
+                  // 发送文本消息
+                  await client.pushMessage(userId, clonedMessage);
+                } else if (clonedMessage.type === 'image') {
+                  // 发送图片消息
+                  await client.pushMessage(userId, {
+                    type: 'image',
+                    originalContentUrl: clonedMessage.originalContentUrl,
+                    previewImageUrl: clonedMessage.previewImageUrl,
+                  });
+                } else {
+                  console.warn(
+                    `Unsupported message type: ${clonedMessage.type}`
+                  );
+                }
+              } catch (sendError) {
+                console.error(
+                  `Error sending message to userId ${userId}:`,
+                  sendError.message
+                );
+              }
+            })
+          );
+
+          // 回复原始触发者
           await client.replyMessage(event.replyToken, clonedMessage);
 
           console.log('Sent cloned message:', clonedMessage);
@@ -222,5 +284,17 @@ async function handleEvent(event) {
   function extractUserIdFromFormSubmission(text) {
     const userIdMatch = text.match(/USER_ID: (\w+)/);
     return userIdMatch ? userIdMatch[1] : null;
+  }
+}
+
+//用userId獲取名字
+async function getDisplayName(userId) {
+  try {
+    const profile = await client.getProfile(userId);
+    console.log('User Profile:', profile);
+    return profile.displayName; // 返回显示名称
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return null; // 如果获取失败，返回 null
   }
 }
