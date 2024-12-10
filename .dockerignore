@@ -4,3 +4,4 @@ npm_cache
 .pnpm-store
 *.log
 .env
+.output

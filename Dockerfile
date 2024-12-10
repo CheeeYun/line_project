@@ -1,26 +1,47 @@
-# 使用官方 Node.js 镜像作为基础镜像
-FROM node:18
+# 使用多階段構建
+# 構建階段
+FROM node:18-alpine AS builder
 
-# 创建和设置工作目录
-WORKDIR /usr/src/app
+# 設置工作目錄
+WORKDIR /app
 
-# 复制 package.json 和 package-lock.json（如果存在）
-COPY package*.json ./
+# 安裝 pnpm
+RUN npm install -g pnpm
 
-# 安装依赖
-RUN npm install
+# 複製 package.json 和 pnpm-lock.yaml (如果有的話)
+COPY package.json pnpm-lock.yaml* ./
 
-# 安装指定版本的 esbuild
-RUN npm install esbuild@latest
+# 安裝所有依賴（包括開發依賴）
+RUN pnpm install --frozen-lockfile
 
-# 设置环境变量以增加 esbuild 内存限制
-ENV NODE_OPTIONS=--max_old_space_size=4096
-
-# 复制项目的其余文件
+# 複製應用程式代碼
 COPY . .
 
-# 暴露应用程序的端口
+# 構建應用
+RUN pnpm run build
+
+# 運行階段
+FROM node:18-alpine
+
+WORKDIR /app
+
+# 安裝 pnpm
+RUN npm install -g pnpm
+
+# 從構建階段複製必要文件
+COPY --from=builder /app/.output /app/.output
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml* ./
+
+# 只安裝生產環境依賴
+RUN pnpm install --prod --frozen-lockfile
+
+# 設置環境變量
+ENV HOST=0.0.0.0
+ENV PORT=10000
+ENV NODE_ENV=production
+
+# 暴露端口
 EXPOSE 10000
 
-# 启动应用程序
-CMD [ "npm", "run", "dev" ]
+# 啟動命令
+CMD ["node", ".output/server/index.mjs"]
